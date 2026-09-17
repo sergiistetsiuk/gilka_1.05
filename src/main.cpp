@@ -176,7 +176,11 @@ enum UIMode
   UI_HOME,
   UI_MENU,
   UI_EDIT,
-  UI_WIFI_INFO
+  UI_WIFI_INFO,
+  UI_SYS,
+  UI_SYS_EDIT,
+  UI_OTA,
+  UI_BATTERY
 };
 
 UIMode uiMode =
@@ -233,6 +237,7 @@ bool buttonWakeOnly = false;
 // ======================================================
 
 void renderUI();
+void saveEdit();
 
 void showBoot();
 void showOnline();
@@ -885,6 +890,7 @@ void showEdit()
 void showWiFiInfo()
 {
   if (!oledReady) return;
+  if (apRunning) { showSetup(); return; }
   oledBegin();
   if (WiFi.status() == WL_CONNECTED)
   {
@@ -909,8 +915,12 @@ void showWiFiInfo()
 // RENDER CURRENT UI
 // ======================================================
 
+#include "Sections.h"
+
 void renderUI()
 {
+
+  if (oledReady && Sections::renderIfActive()) return;
 
   if (!oledReady)
   {
@@ -1354,7 +1364,7 @@ void handleEncoderStep(
     int direction)
 {
 
-  EncoderBuzzer::beep(EncoderBuzzer::ROTATE_MS);
+  Sections::feedback(false);
 
   bool wasOff =
       oledPowerState ==
@@ -1375,6 +1385,17 @@ void handleEncoderStep(
 
     return;
   }
+
+  if (Sections::ready && buttonStable == LOW)
+  {
+    if (!buttonWakeOnly)
+    {
+      buttonLongHandled = true;
+      Sections::heldStep(direction);
+    }
+    return;
+  }
+  if (Sections::ready && Sections::rotate(direction)) return;
 
   // --------------------------------------------------
   // HOME -> MENU
@@ -1457,10 +1478,8 @@ void handleEncoderStep(
       UI_WIFI_INFO)
   {
 
-    uiMode =
-        UI_MENU;
-
-    showMenu();
+    uiMode = Sections::ready ? UI_SYS : UI_MENU;
+    renderUI();
   }
 }
 
@@ -1470,6 +1489,8 @@ void handleEncoderStep(
 
 void handleShortPress()
 {
+
+  if (Sections::ready && Sections::click()) return;
 
   oledWake(
       false);
@@ -1527,7 +1548,7 @@ void handleShortPress()
     case MENU_EXIT:
 
       uiMode =
-          UI_HOME;
+          UI_SYS;
 
       renderUI();
 
@@ -1553,7 +1574,7 @@ void handleShortPress()
   case UI_WIFI_INFO:
 
     uiMode =
-        UI_MENU;
+        UI_SYS;
 
     showMenu();
 
@@ -1567,29 +1588,8 @@ void handleShortPress()
 
 void handleLongPress()
 {
-
-  Serial.println(
-      "[ENC] long press -> HOME");
-
-  /*
-     Long press =
-     повернутися на HOME.
-
-     Якщо редагування не було
-     збережене — повертаємо
-     реальну яскравість.
-  */
-
-  oledSetContrast(
-      oledBrightness);
-
-  uiMode =
-      UI_HOME;
-
-  oledWake(
-      false);
-
-  renderUI();
+  if (Sections::ready) Sections::longPress();
+  else { uiMode = UI_HOME; oledWake(true); }
 }
 
 // ======================================================
@@ -1598,156 +1598,41 @@ void handleLongPress()
 
 void pollEncoder()
 {
-
-  // ==================================================
-  // ROTATION
-  // ==================================================
-
-  uint8_t currentAB =
-      (digitalRead(
-           ENCODER_A)
-       << 1) |
-      digitalRead(
-          ENCODER_B);
-
-  uint8_t index =
-      (encoderPreviousAB << 2) |
-      currentAB;
-
-  encoderAccumulator +=
-      encoderTable[index];
-
-  encoderPreviousAB =
-      currentAB;
-
-  if (
-      encoderAccumulator >=
-      4)
+  const uint32_t now = millis();
+  const bool raw = digitalRead(ENCODER_BUTTON);
+  if (raw != buttonRaw) { buttonRaw = raw; buttonChangedAt = now; }
+  // Process button edges before the detent so holding selects sections.
+  if (uint32_t(now - buttonChangedAt) >= BUTTON_DEBOUNCE_MS && buttonStable != buttonRaw)
   {
-
-    encoderAccumulator =
-        0;
-
-    handleEncoderStep(
-        +1);
-  }
-
-  if (
-      encoderAccumulator <=
-      -4)
-  {
-
-    encoderAccumulator =
-        0;
-
-    handleEncoderStep(
-        -1);
-  }
-
-  // ==================================================
-  // BUTTON RAW STATE
-  // ==================================================
-
-  bool raw =
-      digitalRead(
-          ENCODER_BUTTON);
-
-  if (
-      raw !=
-      buttonRaw)
-  {
-
-    buttonRaw =
-        raw;
-
-    buttonChangedAt =
-        millis();
-  }
-
-  // ==================================================
-  // DEBOUNCE
-  // ==================================================
-
-  if (
-      millis() -
-          buttonChangedAt >=
-      BUTTON_DEBOUNCE_MS)
-  {
-
-    if (
-        buttonStable !=
-        buttonRaw)
+    buttonStable = buttonRaw;
+    if (buttonStable == LOW)
     {
-
-      buttonStable =
-          buttonRaw;
-
-      // --------------------------------------------
-      // PRESS
-      // --------------------------------------------
-
-      if (
-          buttonStable ==
-          LOW)
-      {
-
-        // One beep per debounced press, including a press that only wakes OLED.
-        EncoderBuzzer::beep(EncoderBuzzer::PRESS_MS);
-
-        buttonDownAt =
-            millis();
-
-        buttonLongHandled =
-            false;
-
-        buttonWakeOnly =
-            (oledPowerState ==
-             OLED_OFF);
-
-        oledWake(
-            false);
-
-        renderUI();
-      }
-
-      // --------------------------------------------
-      // RELEASE
-      // --------------------------------------------
-
-      else
-      {
-
-        if (
-            !buttonLongHandled &&
-            !buttonWakeOnly)
-        {
-
-          handleShortPress();
-        }
-
-        buttonWakeOnly =
-            false;
-      }
+      buttonDownAt = now;
+      buttonLongHandled = false;
+      buttonWakeOnly = oledPowerState == OLED_OFF;
+      Sections::feedback(true);
+      oledWake(true);
+    }
+    else
+    {
+      if (Sections::selecting) Sections::releaseSelection();
+      else if (!buttonLongHandled && !buttonWakeOnly) handleShortPress();
+      buttonWakeOnly = false;
     }
   }
-
-  // ==================================================
-  // LONG PRESS
-  // ==================================================
-
-  if (
-      buttonStable ==
-          LOW &&
-      !buttonLongHandled &&
-      !buttonWakeOnly &&
-      millis() -
-              buttonDownAt >=
-          BUTTON_LONG_MS)
+  const uint8_t currentAB = (digitalRead(ENCODER_A) << 1) | digitalRead(ENCODER_B);
+  const uint8_t index = (encoderPreviousAB << 2) | currentAB;
+  encoderAccumulator += encoderTable[index];
+  encoderPreviousAB = currentAB;
+  if ((encoderAccumulator >= 4 || encoderAccumulator <= -4) && buttonRaw == buttonStable)
   {
-
-    buttonLongHandled =
-        true;
-
+    const int direction = encoderAccumulator > 0 ? 1 : -1;
+    encoderAccumulator = 0;
+    handleEncoderStep(direction);
+  }
+  if (buttonStable == LOW && !buttonLongHandled && !buttonWakeOnly && uint32_t(now - buttonDownAt) >= BUTTON_LONG_MS)
+  {
+    buttonLongHandled = true;
     handleLongPress();
   }
 }
@@ -2060,7 +1945,7 @@ bool connectSavedWiFi()
     oledWake(
         false);
 
-    showOnline();
+    renderUI();
 
     return true;
   }
@@ -2513,9 +2398,10 @@ type="submit">
 
 <p class="small">
 
-Rotate — menu / value<br>
-Press — select / save<br>
-Long press — home
+Hold + rotate — select section; release — open<br>
+Rotate — timer preset / setting<br>
+Press — action / save<br>
+Long press in settings — save / back
 
 </p>
 
@@ -2528,6 +2414,7 @@ Long press — home
 </html>
 )HTML";
 
+  html.replace("</body>", Sections::webSettings() + "</body>");
   return html;
 }
 
@@ -2740,6 +2627,8 @@ void redirectPortal()
 void setupWebServer()
 {
 
+  server.on("/sections", HTTP_POST, Sections::saveWebSettings);
+
   server.on(
       "/",
       HTTP_GET,
@@ -2859,7 +2748,7 @@ void handleWiFiConnected()
       UI_HOME)
   {
 
-    showOnline();
+    renderUI();
   }
 
   if (apRunning)
@@ -2877,6 +2766,9 @@ void handleWiFiConnected()
 
 void setup()
 {
+
+  // Silence the buzzer before USB Serial or any other initialization.
+  EncoderBuzzer::silenceOutput();
 
   Serial.begin(
       115200);
@@ -3013,6 +2905,8 @@ void setup()
 
   oledLastActivity =
       millis();
+  Sections::begin();
+
 }
 
 // ======================================================
@@ -3021,6 +2915,8 @@ void setup()
 
 void loop()
 {
+
+  Sections::tick();
 
   // ==================================================
   // ENCODER
@@ -3095,7 +2991,7 @@ void loop()
       oledWake(
           false);
 
-      showWiFiLost();
+      renderUI();
     }
   }
 
@@ -3184,7 +3080,7 @@ void loop()
     lastOLEDRefresh =
         millis();
 
-    showOnline();
+    renderUI();
   }
 
   // ==================================================

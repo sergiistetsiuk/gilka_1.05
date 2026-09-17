@@ -1,5 +1,19 @@
 # Firmware verification
 
+## Current: six-section firmware, 2026-09-17
+
+This status supersedes the older review and pending buzzer notes below. The user confirmed the 3.3V active-low buzzer works.
+
+- Implemented hold + rotate + release selection across six sections, timer/stopwatch, NTP clock, Cherkasy weather and regional alert clients, explicitly labeled radiation simulation, persistent settings, and physically armed OTA. See `docs/SECTIONS.md`.
+- Retained GPIOs, 3.3V buzzer wiring, 4MB flash overrides, and the OLED doubled-height text workaround.
+- Both native test executables passed with `-Wall -Wextra -Werror`: OLED settings and section timer/freshness/wrapping logic. `git diff --check` passed.
+- PlatformIO build passed: RAM 51,500 bytes / 327,680; application flash 1,030,365 / 1,310,720 bytes.
+- USB upload to `/dev/cu.usbmodem2101` succeeded with flash hashes verified.
+- A subsequent 27-second boot observation confirmed OLED at 0x3C, encoder GPIO5/4/6, HTTP server startup, Wi-Fi connection at 192.168.50.136, and mDNS startup. No crash was observed. Initial NVS missing-key messages for timezone and API keys are expected; defaults are used.
+- The computer could not resolve gilka.local or route to the device IP during web checks. Live HTTP rendering and invalid POST validation therefore remain unverified on hardware.
+- No API keys are stored, so live API results/TLS handshakes were not tested. Physical menu gestures, LED color, timing/sound perception, and OTA transfer require device confirmation. Radar and battery inputs remain deliberately unconfigured pending wiring details.
+
+
 ## 2026-09-17 source review and fixes
 
 - Reject incomplete, malformed, negative, overflowing, or out-of-range OLED web settings with HTTP 400 before modifying RAM or NVS.
@@ -74,9 +88,11 @@ All normal screens now use three blue text rows at Y=0,16,32 and yellow status t
 
 ### Encoder buzzer
 
-Added active-low output on GPIO7 for a three-pin buzzer module with a 3.3V-compatible input. Rotation triggers an 8 ms pulse per completed detent; a debounced button press triggers one 30 ms pulse, including a wake-only press. Release and long-press recognition do not add a second beep. GPIO is initialized HIGH (silent).
+Added output on GPIO7 for a three-pin buzzer module with a 3.3V-compatible input. The user observed continuous sound with active-high logic and silence during actions, confirming active-low behavior. Restored LOW for beep and HIGH for silence, including initialization, timer completion, and error handling. Rotation currently triggers a 20 ms pulse per completed detent; a debounced button press triggers one 80 ms pulse, including a wake-only press. Release and long-press recognition do not add a second beep.
 
 An ESP one-shot timer stops each pulse independently of blocking OLED updates or HTTP processing. Overlapping pulses are ignored rather than extended into a continuous tone; timer errors leave the output silent. Durations are in `include/EncoderBuzzer.h`. This controls duration, not true loudness. Firmware build and upload succeeded; acoustic output and module wiring still need physical confirmation.
+
+The user subsequently reported sustained sound even after startup. Added `silenceOutput()` as the first operation in `setup()`, before Serial initialization; this revision built and uploaded successfully. This only reduces the application startup window and does not explain sustained sound with an idle HIGH output. Buzzer pin labels, actual wiring, supply voltage, and module type need confirmation before further polarity or electrical changes. A pull-up suggestion for a brief startup chirp is not a confirmed remedy for this sustained-sound report.
 
 ## Automated checks
 
@@ -102,3 +118,7 @@ Full firmware compilation remains unverified: `pio run` was blocked from writing
 9. Check captive portal access at `192.168.4.1`, Wi-Fi credential persistence, and OLED settings through the setup AP. Avoid deleting working credentials unless intentionally testing provisioning from scratch.
 
 Buzzer integration is not part of this pass.
+
+### Current buzzer test: 3.3V supply
+
+The module photo identifies an MH-FMD active-low board. The user confirmed that, powered at 5V and disconnected from GPIO7, grounding I/O produces sound and tying I/O to 5V silences it. Direct 3.3V supply previously produced no sound, with test conditions not fully established. The user now requested another 3.3V trial. Kept LOW=on/HIGH=off and early startup silence; increased rotation/press pulses to 20/80 ms to test whether very short pulses were inaudible. No automatic startup beep is added. This does not guarantee that this module operates at 3.3V. Physical sound verification remains pending.
