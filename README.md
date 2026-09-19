@@ -1,4 +1,18 @@
-# GILKA
+# GILKA V1.05
+
+<p align="center">
+  <img src="https://img.shields.io/github/stars/sergiistetsiuk/gilka_1.05?style=for-the-badge&logo=github" alt="GitHub Stars">
+  <img src="https://img.shields.io/github/forks/sergiistetsiuk/gilka_1.05?style=for-the-badge&logo=github" alt="GitHub Forks">
+  <img src="https://img.shields.io/github/last-commit/sergiistetsiuk/gilka_1.05?style=for-the-badge&logo=github" alt="Last Commit">
+  <img src="https://img.shields.io/github/repo-size/sergiistetsiuk/gilka_1.05?style=for-the-badge&logo=github" alt="Repo Size">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/ESP32--S3-E7352C?style=for-the-badge&logo=espressif&logoColor=white" alt="ESP32-S3">
+  <img src="https://img.shields.io/badge/PlatformIO-F5822A?style=for-the-badge&logo=platformio&logoColor=white" alt="PlatformIO">
+  <img src="https://img.shields.io/badge/Arduino-00878F?style=for-the-badge&logo=arduino&logoColor=white" alt="Arduino">
+  <img src="https://img.shields.io/badge/C++-00599C?style=for-the-badge&logo=cplusplus&logoColor=white" alt="C++">
+</p>
 
 GILKA is an ESP32-S3 desktop/portable device with a 128×64 OLED, rotary encoder, and buzzer. Its six sections provide a timer, network-synchronized clock, Cherkasy weather, SaveEcoBot radiation measurements, regional air-alert status, and device settings.
 
@@ -6,14 +20,14 @@ The firmware uses Arduino with PlatformIO. The current target is an **ESP32-S3 Z
 
 ## Features
 
-| Section | Function | Short click | Rotate without holding |
-| --- | --- | --- | --- |
-| TIME & DATE | NTP clock with Kyiv timezone | Cycle 24-hour, 12-hour, and seconds formats | — |
-| TACTICAL: TIMER | Stopwatch or countdown in 30-second steps (00:30–99:30) | Start/pause; acknowledge completed alarm | Adjust/reset duration while paused |
-| METEO: SECTOR | OpenWeatherMap weather for Cherkasy | Switch temperature/humidity and wind/pressure pages | — |
-| DOSIMETER | SaveEcoBot measurements near the configured city (capture date shown) | Toggle approximate gamma uR/h | Toggle measurement / distance and ID |
-| SURGE: ALERT | Ukraine Alarm status for Cherkasy Oblast | Mute current siren | — |
-| SYS: SETTINGS | Sound, display, Wi-Fi, OTA, battery | Open/save setting | Navigate/change value |
+| Section         | Function                                                              | Short click                                         | Rotate without holding               |
+| --------------- | --------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------ |
+| TIME & DATE     | NTP clock with Kyiv timezone                                          | Cycle 24-hour, 12-hour, and seconds formats         | —                                    |
+| TACTICAL: TIMER | Stopwatch or countdown in 30-second steps (00:30–99:30)               | Start/pause; acknowledge completed alarm            | Adjust/reset duration while paused   |
+| METEO: SECTOR   | OpenWeatherMap weather for Cherkasy                                   | Switch temperature/humidity and wind/pressure pages | —                                    |
+| DOSIMETER       | SaveEcoBot measurements near the configured city (capture date shown) | Toggle approximate gamma uR/h                       | Toggle measurement / distance and ID |
+| SURGE: ALERT    | Ukraine Alarm status for Cherkasy Oblast                              | Mute current siren                                  | —                                    |
+| SYS: SETTINGS   | Sound, display, Wi-Fi, OTA, battery                                   | Open/save setting                                   | Navigate/change value                |
 
 Timers continue across sections. Each elapsed minute produces a double beep; countdown completion produces a short beep once per second and flashing onboard red LED. The final alarm replaces the last minute's double beep. Sound settings can suppress these sounds.
 
@@ -23,22 +37,22 @@ Weather and alerts require user-provided API credentials. The dosimeter displays
 
 Pin numbers below are GPIO numbers, not physical header positions.
 
-| Connection | ESP32-S3 Zero |
-| --- | --- |
-| OLED SDA | GPIO1 |
-| OLED SCL | GPIO2 |
-| OLED GND | GND |
-| Encoder A / CLK | GPIO5 |
-| Encoder B / DT | GPIO4 |
-| Encoder button / SW | GPIO6 |
-| Encoder common / GND | GND |
-| MH-FMD buzzer I/O | GPIO7 |
-| MH-FMD buzzer VCC | **3V3** |
-| MH-FMD buzzer GND | GND |
-| External status LED anode (+) | GPIO8 through a 330 Ω series resistor |
-| External status LED cathode (−) | GND |
-| Battery divider midpoint | GPIO9 (100 kΩ to battery +, 100 kΩ to GND) |
-| Onboard RGB LED | GPIO21; no external LED required |
+| Connection                      | ESP32-S3 Zero                              |
+| ------------------------------- | ------------------------------------------ |
+| OLED SDA                        | GPIO1                                      |
+| OLED SCL                        | GPIO2                                      |
+| OLED GND                        | GND                                        |
+| Encoder A / CLK                 | GPIO5                                      |
+| Encoder B / DT                  | GPIO4                                      |
+| Encoder button / SW             | GPIO6                                      |
+| Encoder common / GND            | GND                                        |
+| MH-FMD buzzer I/O               | GPIO7                                      |
+| MH-FMD buzzer VCC               | **3V3**                                    |
+| MH-FMD buzzer GND               | GND                                        |
+| External status LED anode (+)   | GPIO8 through a 330 Ω series resistor      |
+| External status LED cathode (−) | GND                                        |
+| Battery divider midpoint        | GPIO9 (100 kΩ to battery +, 100 kΩ to GND) |
+| Onboard RGB LED                 | GPIO21; no external LED required           |
 
 Use an OLED module compatible with 3.3V power and I²C logic, and connect its VCC to 3V3. Encoder inputs use internal pull-ups; contacts switch to ground. All connected modules share ground.
 
@@ -101,14 +115,14 @@ After the display turns off, the first interaction only wakes it. Release and in
 
 ### Settings
 
-| Setting | Behavior |
-| --- | --- |
-| SOUND | MUTE / LOW / MAX / CLICKS ONLY; LOW is the initial default |
-| DISPLAY | Normal/dim contrast and dim/off timeouts |
-| WI-FI CONFIG | Open the setup access point and captive portal |
-| OTA UPDATE | Arm a temporary authenticated upload window |
-| BATTERY | 1S battery voltage and approximate percentage via GPIO9 |
-| WI-FI INFO | Show network or active setup details |
+| Setting      | Behavior                                                   |
+| ------------ | ---------------------------------------------------------- |
+| SOUND        | MUTE / LOW / MAX / CLICKS ONLY; LOW is the initial default |
+| DISPLAY      | Normal/dim contrast and dim/off timeouts                   |
+| WI-FI CONFIG | Open the setup access point and captive portal             |
+| OTA UPDATE   | Arm a temporary authenticated upload window                |
+| BATTERY      | 1S battery voltage and approximate percentage via GPIO9    |
+| WI-FI INFO   | Show network or active setup details                       |
 
 The buzzer is silent while idle. LOW/MAX change pulse duration, **not true volume**. MUTE suppresses all sounds; CLICKS ONLY keeps encoder feedback while suppressing timer and alert sounds. Visual alarms remain enabled.
 
@@ -169,19 +183,19 @@ pio run -e esp32-s3-zero -t upload --upload-port /dev/cu.usbmodem2101
 
 ## Project structure
 
-| Path | Purpose |
-| --- | --- |
-| `src/main.cpp` | Hardware startup, Wi-Fi/captive portal, web server, encoder, OLED rendering and power management |
-| `include/Sections.h` | Section screens, interaction, settings, alarms, and OTA |
-| `include/SectionLogic.h` | Portable timer and freshness logic |
-| `include/SectionServices.h` | Background weather and air-alert API clients |
-| `include/EncoderBuzzer.h` | Active-low buzzer control and pulse timer |
-| `include/OLEDSettings.h` | Display setting validation and normalization |
-| `include/ServiceTrust.h` | Public CA certificates for outbound HTTPS |
-| `src/oled_diagnostic*.cpp` | Standalone display diagnostics |
-| `test/` | Host-side tests |
-| `docs/SECTIONS.md` | Detailed controls, optional sensor configuration, and service behavior |
-| `VERIFICATION.md` | Verification results and troubleshooting history; latest status is at the top |
+| Path                        | Purpose                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------ |
+| `src/main.cpp`              | Hardware startup, Wi-Fi/captive portal, web server, encoder, OLED rendering and power management |
+| `include/Sections.h`        | Section screens, interaction, settings, alarms, and OTA                                          |
+| `include/SectionLogic.h`    | Portable timer and freshness logic                                                               |
+| `include/SectionServices.h` | Background weather and air-alert API clients                                                     |
+| `include/EncoderBuzzer.h`   | Active-low buzzer control and pulse timer                                                        |
+| `include/OLEDSettings.h`    | Display setting validation and normalization                                                     |
+| `include/ServiceTrust.h`    | Public CA certificates for outbound HTTPS                                                        |
+| `src/oled_diagnostic*.cpp`  | Standalone display diagnostics                                                                   |
+| `test/`                     | Host-side tests                                                                                  |
+| `docs/SECTIONS.md`          | Detailed controls, optional sensor configuration, and service behavior                           |
+| `VERIFICATION.md`           | Verification results and troubleshooting history; latest status is at the top                    |
 
 ## Current verification status
 
