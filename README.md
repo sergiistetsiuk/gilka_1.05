@@ -61,8 +61,6 @@ The desktop/portable device uses a **128×64 OLED**, **rotary encoder**, and **M
 
 The **simulation** is the device concept and presentation. Environmental values are not fictional: DOSIMETER uses provider records and does not generate synthetic radiation readings, detector clicks, or flashes.
 
-**Inspiration reference:** [Детектор «Гілка» — Ukrainian S.T.A.L.K.E.R. Wiki](https://stalker.fandom.com/uk/wiki/%D0%94%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%BE%D1%80_%C2%AB%D0%93%D1%96%D0%BB%D0%BA%D0%B0%C2%BB).
-
 > [!IMPORTANT]
 > **This is not a local radiation sensor or an official alert device.** DOSIMETER displays remote station data; use official alert channels alongside GILKA. Implemented features and hardware-verified behavior are distinguished in [Current verification status](#current-verification-status).
 
