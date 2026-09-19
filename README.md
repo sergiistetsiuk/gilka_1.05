@@ -3,7 +3,7 @@
 <h1 align="center">☢️ GILKA V1.05</h1>
 
 <p align="center">
-  <strong>A fan-made simulation of the «Гілка» (Hilka) detector</strong><br>
+  <strong>A fan-made simulation of the «Гілка» (Gilka) detector</strong><br>
   Inspired by <em>S.T.A.L.K.E.R. 2: Heart of Chornobyl</em>
 </p>
 
@@ -40,7 +40,7 @@
 
 ## 🎮 About GILKA
 
-**GILKA V1.05** is a fan-made electronic simulation of the **«Гілка» (Hilka) detector** from **S.T.A.L.K.E.R. 2: Heart of Chornobyl**. It brings the idea of the fictional device into an ESP32-S3 project with physical controls, an OLED interface, sound, and useful everyday information functions.
+**GILKA V1.05** is a fan-made electronic simulation of the **«Гілка» (Gilka) detector** from **S.T.A.L.K.E.R. 2: Heart of Chornobyl**. It brings the idea of the fictional device into an ESP32-S3 project with physical controls, an OLED interface, sound, and useful everyday information functions.
 
 This is an interpretation of the detector, not a claim of real artifact detection or a one-to-one reproduction of its in-game behavior. The documented firmware provides six sections: a timer, network-synchronized clock, Cherkasy weather, remote SaveEcoBot radiation measurements, regional air-alert status, and device settings.
 
@@ -508,10 +508,6 @@ See [detailed section documentation](docs/SECTIONS.md) and the latest [verificat
 <a id="attribution-and-fan-project-notice"></a>
 
 ## 📚 Attribution and fan-project notice
-
-### Inspiration
-
-The project is inspired by the **«Гілка» (Hilka) detector** from **S.T.A.L.K.E.R. 2: Heart of Chornobyl**. The project author's reference is the [Ukrainian S.T.A.L.K.E.R. Wiki article](https://stalker.fandom.com/uk/wiki/%D0%94%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%BE%D1%80_%C2%AB%D0%93%D1%96%D0%BB%D0%BA%D0%B0%C2%BB).
 
 ### Data and technical references
 
