@@ -1,6 +1,102 @@
 # Firmware verification
 
-## Current: six-section firmware, 2026-09-17
+## Latest build and upload, 2026-09-19
+
+- Current firmware compiled and uploaded to ESP32-S3 via /dev/cu.usbmodem2101. Flash hash verified; board reset successfully. Includes Ukraine Alarm, 60-second polling and SOS signalling.
+- Program size: 1,081,653 bytes; static RAM: 52,588 bytes. This confirms build/flash completion, not live API or physical alarm validation.
+
+## Minute polling and SOS, 2026-09-19
+
+- Ukraine Alarm change-index polling is 60 seconds; freshness timeout is 180 seconds. Immediate HTTP error/offline handling remains.
+- Active threats drive synchronized repeating SOS on the buzzer, GPIO8 LED and onboard LED, with 200 ms dots and 600 ms dashes. Pattern starts on alert onset. Mute stops sound while LED signalling continues; timer behavior is preserved.
+- Native tests verify two complete cycles at millisecond boundaries, rollover and freshness limits. PlatformIO build passed. This revision is not uploaded; live alarm timing still needs device confirmation.
+
+## Ukraine Alarm v3, 2026-09-19
+
+- Implemented the supplied Ukraine Alert API 3.0 swagger: raw Authorization token, region name lookup, lastActionIndex polling and region activeAlerts parsing. Separate UKRAINEALARM_API_KEY / uaAlarmKey credential prevents reuse of the prior provider token. SaveEcoBot behavior is unchanged.
+- Tests passed for region matching, clear/AIR/NUCLEAR/INFO, null/unknown/missing responses, large action indices, JSON projection and environment validation. Seven environment tests passed. PlatformIO build passed (1,081,457 bytes flash, 52,580 bytes static RAM).
+- Token was empty during validation. Authenticated API calls and device alarm response remain unverified; this revision has not been uploaded.
+
+## Device public JSON HTTP 403 diagnosis, 2026-09-19
+
+- On-device diagnostics isolated the failure to the public SaveEcoBot request; city geocoding succeeded. The 403 body is a Cloudflare browser challenge (Just a moment, challenges.cloudflare.com), not a TLS certificate failure or malformed gamma JSON. Equivalent desktop requests returned 200.
+- Firmware now identifies the request source in HTTP errors, labels this case Public blocked 403, and backs off to ten-minute retries. TLS validation remains enabled; no attempt is made to bypass the browser challenge. Temporary HTML logging removed. Public live data is not working on this device/network; official authenticated API access still requires a key and testing.
+
+## Public JSON fallback, 2026-09-19
+
+- Empty effective SaveEcoBot key now selects the configured public station JSON. Default station 22800 on vul. Hoholia in Cherkasy returned HTTP 200 without credentials, gamma=150 nSv/h, UTC 2026-09-19 06:12:00. Time was cross-checked with the public map marker gamma_t=1789798320; gamma units are defined as nSv/h in SaveEcoBot map metadata.
+- Public station coordinates are checked against the selected city and radius. OLED source is PUBLIC; stale/old flags remain. API credentials select the existing authenticated path.
+- Six environment tests and native parser tests passed, including actual public-response fixture, wrong pollutant, missing values/time, future time and out-of-radius cases. PlatformIO build passed. USB upload to ESP32-S3 on /dev/cu.usbmodem2101 succeeded with flash hash verification and hardware reset. Live source retrieval is recorded separately when confirmed.
+
+## City/radius configuration, 2026-09-19
+
+- Replaced numeric station override with SAVEECOBOT_STATION city name and SAVEECOBOT_RADIUS_KM. Geocoding is limited to Ukraine; ambiguous names require an oblast qualifier. Station selection uses the resolved coordinates and configured radius.
+- Host tests cover changed city coordinates, radius filtering, ambiguous/foreign geocoding responses, UTF-8 city names and invalid radius values.
+
+## Current: SaveEcoBot dosimeter, 2026-09-19
+
+- Replaced runtime Safecast integration with documented SaveEcoBot radiation endpoints, separate ecoKey NVS credential and SAVEECOBOT_API_KEY environment default.
+- Station lookup streams bounded objects; gamma nSv/h is normalized to uSv/h with UTC time and provider-old status. Prior cached data stays explicitly STALE after errors.
+- Final PlatformIO build and USB upload to ESP32-S3 on /dev/cu.usbmodem2101 succeeded with flash hash verification (1,074,289 bytes program, 52,068 bytes static RAM). The SaveEcoBot key was still empty at build time.
+- Host radiation parser tests and four environment tests passed. Authenticated API retrieval requires the user’s new key; unauthenticated endpoint returns HTTP 401.
+
+## Previous: Safecast dosimeter, 2026-09-19
+
+- Added case-sensitive `safecast_API_KEY` to .env/.env.example and the build loader. Added optional web/NVS `safeKey` configuration with existing precedence and clear semantics. Public reads also work anonymously.
+- DOSIMETER now queries verified HTTPS measurements within 25 km of Cherkasy. Displays original CPM or uSv/h, capture date, distance/ID details, and explicit ARCHIVE (>24 hours) / STALE cache status. CPM is not converted to dose. Synthetic Geiger sound/LED simulation removed from this section.
+- Host parser tests passed using a reduced real public response and malformed/empty/future/out-of-radius/unsupported-unit cases; four .env tests passed.
+- First device test exposed a missing Amazon CA root. Added official Amazon Root CA 1 after fingerprint comparison with the system trust store; TLS validation remains enabled.
+- Final PlatformIO build and USB upload succeeded with hash verification. On-device boot log confirms: `[Safecast] id=231812764 value=19.000 CPM date=2023-12-05 distance=1.4km`. This confirms real HTTPS retrieval/parsing, not current local radiation measurement.
+- OLED appearance and key-authenticated requests are not physically/independently verified; anonymous reads and the complete embedded HTTPS path are verified.
+
+
+## Previous: .env firmware defaults, 2026-09-19
+
+- PlatformIO pre-build hook generates a private header under ignored build output from .env. Wi-Fi SSID/password, weather/alert keys, and timezone are defaults only; existing NVS values, including empty API overrides, take priority.
+- Literal parser performs no shell execution or variable substitution. Secrets are absent from compiler flags and validation messages, but are embedded in binaries. Host/OTA helper variables are not firmware defaults.
+- Three Python tests passed for quoting, UTF-8, literal special characters, validation, missing files, and header refresh. PlatformIO build and USB upload passed with flash verification. README and environment-file comments updated.
+
+
+## Previous: battery indicator, 2026-09-19
+
+- User confirmed 1S Li-ion (4.2 V maximum), 6000 mAh, with 100 kΩ from battery + to GPIO9 and 100 kΩ from GPIO9 to GND. ADC millivolts are doubled, averaged, and filtered.
+- Three battery segments replace the lower-left GILKA status text. Approximate thresholds are 3.40/3.70/3.95 V with 30 mV hysteresis. Invalid readings display a question mark. Startup branding is unchanged.
+- BATTERY shows voltage, rated capacity, and a voltage-based approximate percentage. No charging-current or remaining-capacity measurement is claimed.
+- Native battery tests passed for invalid ranges, percentage clamping, thresholds, and hysteresis. PlatformIO build and USB upload succeeded with flash hash verification. Actual voltage accuracy needs comparison with a multimeter; the OLED icon needs physical confirmation.
+
+
+## Previous: GPIO8 indicator, 2026-09-19
+
+- Added an active-high external LED on GPIO8, initialized off before startup delays. Wiring: GPIO8 through 330 Ω to anode, cathode to GND.
+- Running timers/stopwatch flash each elapsed second; pause stops the heartbeat. Timer completion and latched air alerts take priority with 350 ms on/off. Simulated detector counts flash independently of the sound setting. Existing onboard RGB alarm behavior is retained.
+- Native tests passed for heartbeat boundaries, pause, alarm priority, and simulated indication. PlatformIO build and USB upload passed with flash verification. Physical LED operation awaits wiring/user confirmation.
+
+
+## Previous: settings cleanup, 2026-09-19
+
+- Settings now contain SOUND, DISPLAY, WI-FI CONFIG, OTA UPDATE, BATTERY, and WI-FI INFO. Removed the unused sensor configuration and its runtime code, web field, validation dependency, and documentation references.
+- PlatformIO build passed (application flash 1,029,633 bytes); `git diff --check` passed.
+- After reconnecting the device, USB upload to `/dev/cu.usbmodem2101` succeeded with flash hash verification and automatic reset (2026-09-19).
+
+
+## Previous: inverted startup screen, 2026-09-19
+
+- Startup now renders custom Cyrillic `Гілка.ос` glyphs across 117×42 pixels in the blue region, with `V1.05` centered in the yellow region. The framebuffer is lit with black lettering; no normal status separator is drawn on the splash.
+- The completed frame stays visible for a 2000 ms delay before encoder/Wi-Fi startup continues. Later screens reset their normal drawing colors.
+- PlatformIO build and USB upload passed; flash hash verified. `git diff --check` passed. Physical appearance awaits user confirmation.
+
+
+## Previous: timer changes, 2026-09-19
+
+- Section selector now starts with TIME & DATE, followed by TACTICAL: TIMER.
+- Countdown adjusts in 30-second increments from 00:30 through 99:30; zero selects stopwatch. Boundary values clamp instead of wrapping.
+- Timer completion emits a one-shot 200 ms (LOW) or 300 ms (MAX) beep once per second until acknowledged. Dedicated buzzer pulse timing prevents blocking display work from making the tone continuous. MUTE/CLICKS ONLY still suppress timer alarms; active air-alert sound has priority.
+- Acknowledgment immediately cancels any timer beep.
+- Native section tests passed, including step boundaries, alarm cadence/acknowledgment, and rollover during alarm repetition. PlatformIO build passed; USB upload to /dev/cu.usbmodem2101 succeeded with hash verification.
+- Physical sound and encoder behavior await user confirmation. README and section documentation updated.
+
+
+## Previous: six-section firmware, 2026-09-17
 
 This status supersedes the older review and pending buzzer notes below. The user confirmed the 3.3V active-low buzzer works.
 
@@ -11,7 +107,7 @@ This status supersedes the older review and pending buzzer notes below. The user
 - USB upload to `/dev/cu.usbmodem2101` succeeded with flash hashes verified.
 - A subsequent 27-second boot observation confirmed OLED at 0x3C, encoder GPIO5/4/6, HTTP server startup, Wi-Fi connection at 192.168.50.136, and mDNS startup. No crash was observed. Initial NVS missing-key messages for timezone and API keys are expected; defaults are used.
 - The computer could not resolve gilka.local or route to the device IP during web checks. Live HTTP rendering and invalid POST validation therefore remain unverified on hardware.
-- No API keys are stored, so live API results/TLS handshakes were not tested. Physical menu gestures, LED color, timing/sound perception, and OTA transfer require device confirmation. Radar and battery inputs remain deliberately unconfigured pending wiring details.
+- No API keys are stored, so live API results/TLS handshakes were not tested. Physical menu gestures, LED color, timing/sound perception, and OTA transfer require device confirmation. Battery inputs remain deliberately unconfigured pending wiring details.
 
 
 ## 2026-09-17 source review and fixes

@@ -14,3 +14,5 @@ Selected public Mozilla roots from the locally installed certifi CA store. No pr
 - Sectigo Public Server Authentication Root R46
 
 TLS hostname and certificate verification remain enabled. A provider changing certificate chains may require a trust-store update.
+
+- Amazon Root CA 1, added for Safecast (issuer Amazon RSA 2048 M04). Downloaded from [Amazon Trust Services](https://www.amazontrust.com/repository/AmazonRootCA1.pem) and matched against the local system trust store. SHA-256: `8ECDE6884F3D87B1125BA31AC3FCB13D7016DE7F57CC904FE1CB97C6AE98196E`.

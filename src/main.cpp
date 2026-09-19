@@ -1,6 +1,8 @@
 #include <Arduino.h>
+#include "FirmwareDefaults.h"
 #include "OLEDSettings.h"
 #include "EncoderBuzzer.h"
+#include "BatteryMonitor.h"
 
 #include <WiFi.h>
 #include <WebServer.h>
@@ -603,12 +605,20 @@ void oledStatusBar(
   // Left
   // --------------------------------------------------
 
-  display.setCursor(
-      1,
-      STATUS_TEXT_Y);
-
-  display.print(
-      "GILKA");
+  // Two-pixel strokes keep both row parities visible on this panel.
+  display.fillRect(1, 50, 28, 12, SSD1306_WHITE);
+  display.fillRect(3, 52, 24, 8, SSD1306_BLACK);
+  display.fillRect(29, 54, 2, 4, SSD1306_WHITE);
+  if (BatteryMonitor::valid)
+  {
+    for (int i = 0; i < BatteryMonitor::bars; ++i)
+      display.fillRect(4 + i * 8, 52, 6, 8, SSD1306_WHITE);
+  }
+  else
+  {
+    display.setCursor(12, STATUS_TEXT_Y);
+    display.print("?");
+  }
 
   // --------------------------------------------------
   // Right
@@ -649,9 +659,37 @@ void showBoot()
 {
   if (!oledReady) return;
   oledBegin();
-  oledTextRow(0, "ESP32-S3");
-  oledTextRow(1, "Starting...");
-  oledStatusBar("BOOT");
+  display.fillScreen(SSD1306_WHITE);
+
+  // Custom Cyrillic glyphs for "Гілка.ос": the built-in font is not UTF-8.
+  // 3x6 pixel cells fill the blue zone and retain the panel's doubled-row workaround.
+  struct BootGlyph { uint8_t width; uint8_t rows[7]; };
+  static const BootGlyph title[] = {
+    {5, {0x1F, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10}}, // Г
+    {1, {0x01, 0x00, 0x01, 0x01, 0x01, 0x01, 0x01}}, // і
+    {5, {0x00, 0x00, 0x07, 0x09, 0x09, 0x11, 0x11}}, // л
+    {5, {0x00, 0x00, 0x11, 0x12, 0x1C, 0x12, 0x11}}, // к
+    {5, {0x00, 0x00, 0x0E, 0x01, 0x0F, 0x11, 0x0F}}, // а
+    {1, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}}, // .
+    {5, {0x00, 0x00, 0x0E, 0x11, 0x11, 0x11, 0x0E}}, // о
+    {5, {0x00, 0x00, 0x0F, 0x10, 0x10, 0x10, 0x0F}}, // с
+  };
+  constexpr int scaleX = 3, scaleY = 6;
+  int x = (SCREEN_WIDTH - 39 * scaleX) / 2;
+  for (const BootGlyph &glyph : title)
+  {
+    for (int row = 0; row < 7; ++row)
+      for (int col = 0; col < glyph.width; ++col)
+        if (glyph.rows[row] & (1 << (glyph.width - 1 - col)))
+          display.fillRect(x + col * scaleX, 2 + row * scaleY,
+                           scaleX, scaleY, SSD1306_BLACK);
+    x += (glyph.width + 1) * scaleX;
+  }
+
+  display.setTextColor(SSD1306_BLACK);
+  display.setTextSize(2, 2);
+  display.setCursor((SCREEN_WIDTH - 5 * 12) / 2, YELLOW_Y_START);
+  display.print("V1.05");
   oledEnd();
 }
 
@@ -2769,6 +2807,8 @@ void setup()
 
   // Silence the buzzer before USB Serial or any other initialization.
   EncoderBuzzer::silenceOutput();
+  digitalWrite(Sections::STATUS_LED_PIN, LOW);
+  pinMode(Sections::STATUS_LED_PIN, OUTPUT);
 
   Serial.begin(
       115200);
@@ -2804,12 +2844,12 @@ void setup()
   savedSSID =
       preferences.getString(
           "ssid",
-          "");
+          FirmwareDefaults::WIFI_SSID);
 
   savedPassword =
       preferences.getString(
           "pass",
-          "");
+          preferences.isKey("ssid") ? "" : FirmwareDefaults::WIFI_PASSWORD);
 
   oledBrightness =
       preferences.getUChar(
@@ -2854,9 +2894,11 @@ void setup()
   // OLED
   // ==================================================
 
+  BatteryMonitor::begin();
   initOLED();
 
   showBoot();
+  if (oledReady) delay(2000); // Keep the completed splash visible for two seconds.
 
   // ==================================================
   // ENCODER
@@ -2916,6 +2958,7 @@ void setup()
 void loop()
 {
 
+  BatteryMonitor::tick();
   Sections::tick();
 
   // ==================================================

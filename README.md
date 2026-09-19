@@ -1,6 +1,6 @@
 # GILKA
 
-GILKA is an ESP32-S3 desktop/portable device with a 128×64 OLED, rotary encoder, and buzzer. Its six sections provide a timer, network-synchronized clock, Cherkasy weather, a radiation simulation, regional air-alert status, and device settings.
+GILKA is an ESP32-S3 desktop/portable device with a 128×64 OLED, rotary encoder, and buzzer. Its six sections provide a timer, network-synchronized clock, Cherkasy weather, SaveEcoBot radiation measurements, regional air-alert status, and device settings.
 
 The firmware uses Arduino with PlatformIO. The current target is an **ESP32-S3 Zero (ESP32-S3FH4R2, 4 MB flash)**. Configuration is available on the OLED and through a local web page.
 
@@ -8,16 +8,16 @@ The firmware uses Arduino with PlatformIO. The current target is an **ESP32-S3 Z
 
 | Section | Function | Short click | Rotate without holding |
 | --- | --- | --- | --- |
-| TACTICAL: TIMER | Stopwatch or 1/5/15/25-minute countdown | Start/pause; acknowledge completed alarm | Select/reset preset while paused |
 | TIME & DATE | NTP clock with Kyiv timezone | Cycle 24-hour, 12-hour, and seconds formats | — |
+| TACTICAL: TIMER | Stopwatch or countdown in 30-second steps (00:30–99:30) | Start/pause; acknowledge completed alarm | Adjust/reset duration while paused |
 | METEO: SECTOR | OpenWeatherMap weather for Cherkasy | Switch temperature/humidity and wind/pressure pages | — |
-| DOSIMETER | Clearly labeled radiation **simulation** | Toggle uSv/h and approximate gamma uR/h | Change simulated dose |
-| SURGE: ALERT | Alerts.in.ua status for Cherkasy Oblast | Mute current siren | — |
-| SYS: SETTINGS | Sound, radar hold, display, Wi-Fi, OTA, battery | Open/save setting | Navigate/change value |
+| DOSIMETER | SaveEcoBot measurements near the configured city (capture date shown) | Toggle approximate gamma uR/h | Toggle measurement / distance and ID |
+| SURGE: ALERT | Ukraine Alarm status for Cherkasy Oblast | Mute current siren | — |
+| SYS: SETTINGS | Sound, display, Wi-Fi, OTA, battery | Open/save setting | Navigate/change value |
 
-Timers continue across sections. Each elapsed minute produces a double beep; countdown completion produces a continuous alarm and flashing onboard red LED. The final alarm replaces the last minute's double beep. Sound settings can suppress these sounds.
+Timers continue across sections. Each elapsed minute produces a double beep; countdown completion produces a short beep once per second and flashing onboard red LED. The final alarm replaces the last minute's double beep. Sound settings can suppress these sounds.
 
-Weather and alerts require user-provided API credentials. The dosimeter does **not** measure radiation or read SaveEcoBot. Radar and battery readings remain unconfigured until their wiring is specified.
+Weather and alerts require user-provided API credentials. The dosimeter displays remote SaveEcoBot records; it is not a local radiation sensor. Battery voltage is measured on GPIO9 through a 100 kΩ / 100 kΩ divider for a 1S, 6000 mAh Li-ion battery.
 
 ## Hardware and wiring
 
@@ -35,13 +35,16 @@ Pin numbers below are GPIO numbers, not physical header positions.
 | MH-FMD buzzer I/O | GPIO7 |
 | MH-FMD buzzer VCC | **3V3** |
 | MH-FMD buzzer GND | GND |
+| External status LED anode (+) | GPIO8 through a 330 Ω series resistor |
+| External status LED cathode (−) | GND |
+| Battery divider midpoint | GPIO9 (100 kΩ to battery +, 100 kΩ to GND) |
 | Onboard RGB LED | GPIO21; no external LED required |
 
 Use an OLED module compatible with 3.3V power and I²C logic, and connect its VCC to 3V3. Encoder inputs use internal pull-ups; contacts switch to ground. All connected modules share ground.
 
 The tested MH-FMD module is **active-low**: GPIO7 HIGH is silent, LOW enables sound. The user confirmed operation with the module powered from 3.3V. The earlier 5V supply caused continuous sound with direct GPIO control; retain the working 3.3V wiring for this build.
 
-Optional RCWL-0516 and battery-divider pins are not assigned. A 21700 charging/protection circuit is outside the firmware's scope; do not connect a cell directly to an ADC pin.
+A 21700 charging/protection circuit is outside the firmware's scope; do not connect a cell directly to an ADC pin.
 
 ### OLED configuration
 
@@ -80,7 +83,7 @@ The PlatformIO board definition is `esp32-s3-devkitm-1`, with explicit **4 MB fl
 2. Connect to that access point using **gilka1234**.
 3. Open **http://192.168.4.1** if the captive portal does not appear, and save your Wi-Fi credentials.
 4. On the same home network, open **http://gilka.local**, or use the IP shown in **SYS: SETTINGS → WI-FI INFO**.
-5. In the web page's Sections form, enter the OpenWeatherMap key and Alerts.in.ua token. Blank fields keep existing keys; the remove checkboxes clear them.
+5. In the web page's Sections form, enter the OpenWeatherMap key and Ukraine Alarm token. Blank fields keep existing keys; the remove checkboxes clear them.
 
 Wi-Fi and device preferences persist in ESP32 NVS. The firmware retries a lost connection and opens the setup AP after approximately 30 seconds offline. You can also open it manually through **WI-FI CONFIG**.
 
@@ -101,14 +104,13 @@ After the display turns off, the first interaction only wakes it. Release and in
 | Setting | Behavior |
 | --- | --- |
 | SOUND | MUTE / LOW / MAX / CLICKS ONLY; LOW is the initial default |
-| RADAR SENS | Software motion hold time, 5–120 seconds; requires a configured sensor |
 | DISPLAY | Normal/dim contrast and dim/off timeouts |
 | WI-FI CONFIG | Open the setup access point and captive portal |
 | OTA UPDATE | Arm a temporary authenticated upload window |
-| BATTERY | Voltage and approximate percentage when an ADC divider is configured |
+| BATTERY | 1S battery voltage and approximate percentage via GPIO9 |
 | WI-FI INFO | Show network or active setup details |
 
-The buzzer is silent while idle. LOW/MAX change pulse duration, **not true volume**. MUTE suppresses all sounds; CLICKS ONLY keeps encoder feedback while suppressing timer, alert, and simulated Geiger sounds. Visual alarms remain enabled.
+The buzzer is silent while idle. LOW/MAX change pulse duration, **not true volume**. MUTE suppresses all sounds; CLICKS ONLY keeps encoder feedback while suppressing timer and alert sounds. Visual alarms remain enabled.
 
 Initial display settings are contrast 120, dim contrast 20, dim after 30 seconds, and off after 300 seconds. Saved preferences override these defaults. A zero timeout disables that transition; the setup AP keeps the screen awake.
 
@@ -116,7 +118,7 @@ Initial display settings are contrast 120, dim contrast 20, dim after 30 seconds
 
 - **Time:** NTP with a default Kyiv POSIX timezone of `EET-2EEST,M3.5.0/3,M10.5.0/4`, editable on the web page.
 - **Weather:** Cherkasy city (`Cherkasy,UA`), refreshed every 10 minutes, with 30-second error retries. Obtain an [OpenWeatherMap API key](https://openweathermap.org/api).
-- **Air alerts:** Cherkasy Oblast, region `24`, polled every 30 seconds. Obtain an [Alerts.in.ua token](https://devs.alerts.in.ua/).
+- **Air alerts:** Cherkasy Oblast, resolved by region name; change index checked every 60 seconds. Obtain an [Ukraine Alarm token](https://api.ukrainealarm.com/).
 
 The firmware marks unavailable or stale data explicitly. A received active alert stays latched until a fresh no-alert response; muting stops its siren. An unknown state never means clear. Use official alert channels alongside this device.
 
@@ -185,6 +187,125 @@ pio run -e esp32-s3-zero -t upload --upload-port /dev/cu.usbmodem2101
 
 The six-section firmware compiled and uploaded successfully. Host tests passed, and the boot log confirmed OLED initialization, encoder initialization, HTTP server startup, and a Wi-Fi connection.
 
-Physical section gestures, onboard LED color, live keyed API responses, and OTA transfer still need device-level confirmation. The computer could not reach the device's web page during the last check, so live web behavior remains unverified. Radar and battery require confirmed wiring; radiation readings remain simulated.
+Physical section gestures, onboard LED color, live keyed API responses, and OTA transfer still need device-level confirmation. SaveEcoBot authenticated retrieval still needs an access key (see VERIFICATION.md). The computer could not reach the device's web page during the last check, so live web behavior remains unverified. Battery voltage calibration needs comparison with a multimeter; radiation readings come from SaveEcoBot.
 
 See [detailed section documentation](docs/SECTIONS.md) and the latest [verification record](VERIFICATION.md) before extending the firmware.
+
+## Startup screen
+
+At startup, the OLED displays **Гілка.ос** across the blue region and **V1.05** in the yellow region for two seconds. The entire background is lit with dark lettering. Normal section screens follow with their usual colors. The title uses custom Cyrillic pixel glyphs and retains the display row workaround.
+
+## External indicator (GPIO8)
+
+Connect GPIO8 → 330 Ω resistor → LED anode (+), and LED cathode (−) → GND. HIGH turns the LED on; it is initialized off at boot.
+
+- Running countdown or stopwatch: a short flash each elapsed second (nominally 150 ms), including while another section is open. Pausing stops the heartbeat.
+- Timer completion or latched air alert: 350 ms on / 350 ms off, with priority over other indications. Muting sound does not clear visual alerts.
+- DOSIMETER: displays remote measurements without synthetic detector clicks or flashes.
+- Otherwise: off. The existing onboard RGB alarm indication remains available.
+
+Patterns use the main loop without added delays; display or other loop work may affect exact flash timing. The added GPIO8 LED's physical wiring and brightness need device confirmation.
+
+## Battery indicator
+
+The confirmed battery is **1S Li-ion, 6000 mAh**, up to 4.2 V. Connect battery + → 100 kΩ → GPIO9 → 100 kΩ → battery − / common GND. Equal resistors halve the voltage: firmware multiplies the ADC millivolts by two.
+
+A three-segment battery icon replaces GILKA in the lower-left status bar. Approximate rising levels are 3.40 V (one segment), 3.70 V (two), and 3.95 V (three); below the first threshold the outline is empty. A 30 mV hysteresis and averaging stabilize the display. Invalid readings show `?`, not a full battery. The startup title/version remain unchanged.
+
+SYS: SETTINGS → BATTERY shows measured voltage, rated 6000 mAh capacity, and an approximate percentage (linear 3.2–4.2 V estimate). This is not coulomb counting, a charging-status detector, or a runtime estimate. Load and chemistry affect the relationship between voltage and charge.
+
+Readings use `analogReadMilliVolts`, 16-sample averaging, and a once-per-second update. A 100 nF ceramic capacitor between GPIO9 and GND can reduce ADC noise, as described in [Espressif ADC guidance](https://docs.espressif.com/projects/esp-idf/en/v4.4.7/esp32s3/api-reference/peripherals/adc.html). Compare the displayed voltage with a multimeter before relying on the charge estimate.
+
+## Local environment files
+
+[.env.example](.env.example) is the committed template; `.env` is the private local copy and is ignored by Git. Secret fields start empty. On another checkout, create it with:
+
+```sh
+cp .env.example .env
+chmod 600 .env
+```
+
+PlatformIO reads `.env` automatically before building and embeds `WIFI_SSID`, `WIFI_PASSWORD`, `OPENWEATHERMAP_API_KEY`, `UKRAINEALARM_API_KEY`, `SAVEECOBOT_API_KEY`, and `DEVICE_TIMEZONE` as firmware defaults. Rebuild and upload after editing them. A missing `.env` builds with empty credentials and the default Kyiv timezone.
+
+**Existing NVS settings take priority.** A new device uses the embedded defaults; an already configured device keeps its saved values. Use the web page to change saved settings. Clearing an API key through the web page stores an empty override, so a compiled key does not unexpectedly return. Firmware defaults are not automatically copied into NVS.
+
+The loader accepts `KEY=value`, quoted values, comments, and optional `export`; it does not execute shell commands or expand `$VARIABLES`. UTF-8 values are supported for Wi-Fi. Quote passwords containing spaces or `#`. Invalid values stop the build without printing secrets.
+
+Generated defaults are kept inside ignored `.pio` build output, not command-line compiler flags. Credentials are embedded in firmware binaries, which must also remain private. `PIO_ENV`, `UPLOAD_PORT`, `MONITOR_BAUD`, `DEVICE_URL`, and `OTA_*` remain local command helpers, not firmware defaults. OTA continues to generate its temporary password on the device.
+
+To use the local build/upload variables from a trusted `.env`:
+
+```sh
+set -a
+source .env
+set +a
+pio run -e "$PIO_ENV" -t upload --upload-port "$UPLOAD_PORT"
+pio device monitor --port "$UPLOAD_PORT" --baud "$MONITOR_BAUD"
+```
+
+Use shell quotes around values containing spaces or special characters; single quotes preserve literal `$` characters. Do not commit `.env` or put real credentials in `.env.example`. OTA passwords are temporary and must match the password currently displayed by the device.
+
+The `.env` loader tests can be run with `python3 test/env_config_test.py`.
+
+## SaveEcoBot API key
+
+Set `SAVEECOBOT_API_KEY="your-key"` in `.env`, then rebuild/upload. Alternatively save the key on the device web page. Saved NVS `ecoKey` takes precedence; clearing it selects public JSON fallback. The old Safecast key is not reused.
+
+DOSIMETER selects the nearest station within the configured radius of the selected city and displays gamma dose rate in uSv/h, UTC measurement time, and distance/station ID details. ARCHIVE marks provider-old or >24-hour measurements; STALE marks cached readings after failed/offline refreshes. No simulated radiation sounds are generated.
+
+Get access through the [SaveEcoBot API page](https://www.saveecobot.com/en/static/api). See [implementation and tests](docs/SECTIONS.md#saveecobot-dosimeter).
+
+### SaveEcoBot city and search radius
+
+```dotenv
+SAVEECOBOT_STATION="Cherkasy, Cherkasy Oblast"
+SAVEECOBOT_RADIUS_KM=25
+```
+
+`SAVEECOBOT_STATION` is a Ukrainian city name, not a sensor ID. Ukrainian or English names are accepted by [Open-Meteo geocoding](https://open-meteo.com/en/docs/geocoding-api), based on GeoNames. Add an oblast after a comma for namesakes; ambiguous or missing results stop station lookup with a configuration message. Only Ukrainian populated places are accepted. No API credentials are sent to the geocoder.
+
+`SAVEECOBOT_RADIUS_KM` is the maximum distance from the resolved city centre, in kilometres (greater than 0, at most 500; decimals supported). Firmware selects the nearest SaveEcoBot station inside that circle; it does not average all stations. No station within the radius means no data. Coordinates and selection are cached until reboot/configuration change. Rebuild/upload after editing these values. `SAVEECOBOT_STATION_ID` has been replaced and is no longer used.
+
+### Public JSON fallback without a key
+
+When the effective API key (NVS first, then `.env`) is empty, the worker reads `SAVEECOBOT_PUBLIC_JSON_URL` instead of calling the authenticated API:
+
+```dotenv
+SAVEECOBOT_API_KEY=""
+SAVEECOBOT_PUBLIC_JSON_URL="https://www.saveecobot.com/en/station/22800.json"
+```
+
+This default is the public radiation station on vul. Hoholia, Cherkasy. It is a specific fallback station, not automatic public station discovery. Its coordinates must be inside `SAVEECOBOT_RADIUS_KM` of the configured city; if the city changes, select another public station URL. No national map download occurs on the device. Requests occur every ten minutes, with errors retried after one minute. A nonempty but rejected API key does not silently fall back.
+
+Only public `last_data[].phenomenon == gamma` is accepted, in nSv/h, divided by 1000 for uSv/h. The actual station response was checked against the map's `gamma_t` UNIX timestamp: `2026-09-19 06:12:00` corresponds to `1789798320` UTC. Preserve source time and `is_old`; never substitute fetch time. OLED footer shows PUBLIC for this source and retains ARCHIVE/STALE labels. Missing/malformed/out-of-radius gamma data produces an error or explicitly stale cached reading, never generated values.
+
+The actual public response is in `test/fixtures/saveecobot_public_22800.json`. Data attribution: [SaveEcoBot](https://www.saveecobot.com/). Public JSON usage is described on its [API page](https://www.saveecobot.com/en/static/api).
+
+**Device limitation verified 2026-09-19:** although desktop retrieval of the public JSON succeeds, SaveEcoBot returns an HTTP 403 Cloudflare browser challenge to this ESP32. Firmware shows `Public blocked 403` and retries after ten minutes. The public fallback is therefore not currently usable on this device/network. Obtain an official API key for the authenticated path; authenticated device access still needs verification.
+
+## Ukraine Alarm v3 integration
+
+The supplied `swagger.json` describes [Ukraine Alarm / Stfalcon](https://api.ukrainealarm.com/), not the previous provider. Configure:
+
+```dotenv
+UKRAINEALARM_API_KEY=""
+UKRAINEALARM_REGION_NAME="Черкаська область"
+```
+
+The token is sent verbatim in `Authorization`, with no Bearer prefix. Old Alerts.in.ua credentials are not reused. The web page stores this provider's key in separate NVS `uaAlarmKey`, which takes priority over the compiled `.env` default. Blank form input preserves it; Remove clears it. Rebuild/upload after changing `.env`.
+
+The worker resolves the matching State ID from `/api/v3/regions`, retaining only state names/types/IDs while parsing. It checks `/api/v3/alerts/status` every 60 seconds, loads `/api/v3/alerts/{regionId}` initially or when `lastActionIndex` changes, and also refreshes full state every five minutes. A successful unchanged-index check refreshes connection freshness. Data is stale after 180 seconds without verification, immediately after a request error, or while offline.
+
+AIR, ARTILLERY, URBAN_FIGHTS, CHEMICAL, NUCLEAR and CUSTOM activate the existing buzzer/LED alarm with an appropriate OLED label. INFO displays an informational status without the siren. An explicit empty activeAlerts array for the selected region clears the alarm; null/missing/unknown data does not. A latched threat survives communication errors and invalid responses. Encoder click mutes sound; LED continues until a confirmed clear state. Existing sound mode settings apply. This device supplements official alerts.
+
+Run the parser tests:
+
+```sh
+clang++ -std=c++11 -Wall -Wextra -Werror -Iinclude \
+  -I.pio/libdeps/esp32-s3-zero/ArduinoJson/src \
+  test/ukraine_alarm_test.cpp -o /tmp/gilka-alert-test
+/tmp/gilka-alert-test
+python3 test/env_config_test.py
+```
+
+Ukraine Alarm sound and both LEDs repeat synchronized SOS (three short, three long, three short). Dot: 200 ms; dash: 600 ms; symbol pause: 200 ms; letter pause: 600 ms; repeat pause: 1400 ms. Each new alert starts at the first dot. Mute silences the buzzer while LED SOS continues. Timer signalling is unchanged.
